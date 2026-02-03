@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>publiclinks</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        background: #fff;
+        color: #000;
+        padding: 20px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #000;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: 16px;
+        font-weight: normal;
+      }
+
+      a {
+        color: #000;
+      }
+
+      button,
+      input[type="file"]::file-selector-button {
+        font-family: monospace;
+        font-size: 14px;
+        background: #fff;
+        color: #000;
+        border: 1px solid #000;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+
+      button:hover,
+      input[type="file"]::file-selector-button:hover {
+        background: #000;
+        color: #fff;
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      button:disabled:hover {
+        background: #fff;
+        color: #000;
+      }
+
+      .login-section {
+        text-align: center;
+        padding: 100px 20px;
+      }
+
+      .login-section p {
+        margin-bottom: 20px;
+      }
+
+      .upload-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #000;
+      }
+
+      .upload-form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .file-list {
+        list-style: none;
+      }
+
+      .file-item {
+        padding: 15px 0;
+        border-bottom: 1px solid #ccc;
+      }
+
+      .file-item:last-child {
+        border-bottom: none;
+      }
+
+      .file-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .file-meta {
+        color: #666;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+
+      .file-url {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 5px;
+      }
+
+      .file-url input {
+        font-family: monospace;
+        font-size: 12px;
+        border: 1px solid #ccc;
+        padding: 3px 6px;
+        flex: 1;
+        max-width: 400px;
+      }
+
+      .file-actions {
+        display: flex;
+        gap: 5px;
+      }
+
+      .file-actions button {
+        font-size: 12px;
+        padding: 3px 8px;
+      }
+
+      .btn-delete {
+        border-color: #999;
+        color: #999;
+      }
+
+      .btn-delete:hover {
+        background: #000;
+        color: #fff;
+        border-color: #000;
+      }
+
+      .status {
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 1px solid #000;
+      }
+
+      .status.error {
+        border-color: #900;
+        color: #900;
+      }
+
+      .status.success {
+        border-color: #090;
+        color: #090;
+      }
+
+      .empty {
+        color: #666;
+        padding: 40px 0;
+        text-align: center;
+      }
+
+      .loading {
+        color: #666;
+      }
+
+      #user-info {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div class="loading">loading...</div>
+    </div>
+
+    <script>
+      const API = {
+        async getMe() {
+          const res = await fetch("/auth/me");
+          if (res.status === 401) return null;
+          return res.json();
+        },
+
+        async getFiles() {
+          const res = await fetch("/api/files");
+          if (!res.ok) throw new Error("Failed to fetch files");
+          return res.json();
+        },
+
+        async uploadFile(file) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/files", {
+            method: "POST",
+            body: formData,
+          });
+          if (!res.ok) throw new Error("Failed to upload file");
+          return res.json();
+        },
+
+        async deleteFile(id) {
+          const res = await fetch(`/api/files/${id}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) throw new Error("Failed to delete file");
+          return res.json();
+        },
+      };
+
+      function formatBytes(bytes) {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+      }
+
+      function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString() + " " + d.toLocaleTimeString();
+      }
+
+      function copyToClipboard(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = "copied!";
+          setTimeout(() => (btn.textContent = orig), 1000);
+        });
+      }
+
+      async function init() {
+        const app = document.getElementById("app");
+
+        try {
+          const user = await API.getMe();
+
+          if (!user) {
+            // Not logged in
+            app.innerHTML = `
+                        <header>
+                            <h1>publiclinks</h1>
+                        </header>
+                        <div class="login-section">
+                            <p>upload files. get links.</p>
+                            <a href="/auth/login"><button>sign in with google</button></a>
+                        </div>
+                    `;
+            return;
+          }
+
+          // Logged in - show app
+          app.innerHTML = `
+                    <header>
+                        <h1>publiclinks</h1>
+                        <div id="user-info">
+                            ${user.email} | <a href="/auth/logout">logout</a>
+                        </div>
+                    </header>
+                    <div id="status"></div>
+                    <div class="upload-section">
+                        <form class="upload-form" id="upload-form">
+                            <input type="file" id="file-input" required>
+                            <button type="submit" id="upload-btn">upload</button>
+                        </form>
+                    </div>
+                    <div id="file-list-container">
+                        <div class="loading">loading files...</div>
+                    </div>
+                `;
+
+          // Setup upload form
+          const form = document.getElementById("upload-form");
+          const fileInput = document.getElementById("file-input");
+          const uploadBtn = document.getElementById("upload-btn");
+
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = "uploading...";
+            showStatus("Uploading...", "");
+
+            try {
+              await API.uploadFile(file);
+              showStatus("File uploaded!", "success");
+              fileInput.value = "";
+              loadFiles();
+            } catch (err) {
+              showStatus("Upload failed: " + err.message, "error");
+            } finally {
+              uploadBtn.disabled = false;
+              uploadBtn.textContent = "upload";
+            }
+          });
+
+          // Load files
+          loadFiles();
+        } catch (err) {
+          app.innerHTML = `<div class="status error">Error: ${err.message}</div>`;
+        }
+      }
+
+      function showStatus(message, type) {
+        const status = document.getElementById("status");
+        if (!message) {
+          status.innerHTML = "";
+          return;
+        }
+        status.innerHTML = `<div class="status ${type}">${message}</div>`;
+        if (type === "success") {
+          setTimeout(() => showStatus("", ""), 3000);
+        }
+      }
+
+      async function loadFiles() {
+        const container = document.getElementById("file-list-container");
+
+        try {
+          const data = await API.getFiles();
+          const files = data.files;
+
+          if (files.length === 0) {
+            container.innerHTML =
+              '<div class="empty">no files yet. upload something!</div>';
+            return;
+          }
+
+          container.innerHTML = `
+                    <ul class="file-list">
+                        ${files
+                          .map(
+                            (f) => `
+                            <li class="file-item" data-id="${f.id}">
+                                <div class="file-name">${escapeHtml(f.filename)}</div>
+                                <div class="file-meta">
+                                    ${formatBytes(f.size_bytes)} · ${f.content_type} · ${formatDate(f.created_at)} · by ${escapeHtml(f.uploader_email)}
+                                </div>
+                                <div class="file-url">
+                                    <input type="text" readonly value="${f.dub_url || window.location.origin + "/f/" + f.r2_key}" onclick="this.select()">
+                                    <div class="file-actions">
+                                        <button onclick="copyToClipboard('${f.dub_url || window.location.origin + "/f/" + f.r2_key}', this)">copy</button>
+                                        <button class="btn-delete" onclick="deleteFile(${f.id})">delete</button>
+                                    </div>
+                                </div>
+                            </li>
+                        `,
+                          )
+                          .join("")}
+                    </ul>
+                `;
+        } catch (err) {
+          container.innerHTML = `<div class="status error">Failed to load files: ${err.message}</div>`;
+        }
+      }
+
+      async function deleteFile(id) {
+        if (!confirm("Delete this file?")) return;
+
+        try {
+          await API.deleteFile(id);
+          showStatus("File deleted", "success");
+          loadFiles();
+        } catch (err) {
+          showStatus("Delete failed: " + err.message, "error");
+        }
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      init();
+    </script>
+  </body>
+</html>
