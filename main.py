@@ -44,6 +44,12 @@ async def startup():
     database.init_db()
 
 
+# Healthcheck for Railway
+@app.get("/health")
+async def healthcheck():
+    return {"status": "ok"}
+
+
 # Auth helpers
 def get_current_user(request: Request) -> dict | None:
     """Get current user from session."""
