@@ -28,15 +28,18 @@ R2_PUBLIC_URL = os.getenv("R2_PUBLIC_URL", "").rstrip("/")
 app = FastAPI(title="publiclinks")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
-# OAuth setup
+# OAuth setup (lazy initialization)
 oauth = OAuth()
-oauth.register(
-    name="google",
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"},
-)
+
+@app.on_event("startup")
+async def setup_oauth():
+    oauth.register(
+        name="google",
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+        client_kwargs={"scope": "openid email profile"},
+    )
 
 # Initialize database on startup
 @app.on_event("startup")
