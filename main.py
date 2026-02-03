@@ -1,5 +1,6 @@
 import os
 import uuid
+from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -15,6 +16,10 @@ import httpx
 import database
 import r2
 import dub
+
+# Get the directory where this script is located
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
 
 # Config
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
@@ -41,16 +46,16 @@ async def setup_oauth():
         client_kwargs={"scope": "openid email profile"},
     )
 
+# Healthcheck for Railway - defined early, no dependencies
+@app.get("/health")
+async def healthcheck():
+    return {"status": "ok"}
+
+
 # Initialize database on startup
 @app.on_event("startup")
 async def startup():
     database.init_db()
-
-
-# Healthcheck for Railway
-@app.get("/health")
-async def healthcheck():
-    return {"status": "ok"}
 
 
 # Auth helpers
@@ -250,11 +255,11 @@ async def serve_file(r2_key: str, request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the main page."""
-    with open("static/index.html", "r") as f:
+    with open(STATIC_DIR / "index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 if __name__ == "__main__":
