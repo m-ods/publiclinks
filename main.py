@@ -188,19 +188,63 @@ async def upload_file(request: Request, file: UploadFile, user: dict = Depends(r
     )
     
     # Create dub.co short link (using our proxy URL for auth)
+    # Use filename (without extension) as the default short link key
     proxy_url = f"{BASE_URL}/f/{r2_key}"
-    dub_url = await dub.create_short_link(proxy_url)
+    dub_result = await dub.create_short_link(proxy_url, key=file.filename)
     
-    if dub_url:
-        database.update_file_dub_url(db_file["id"], dub_url)
-        db_file["dub_url"] = dub_url
+    if dub_result:
+        database.update_file_dub_url(
+            db_file["id"], 
+            dub_result["shortLink"], 
+            dub_result["id"], 
+            dub_result["key"]
+        )
+        db_file["dub_url"] = dub_result["shortLink"]
+        db_file["dub_link_id"] = dub_result["id"]
+        db_file["dub_key"] = dub_result["key"]
     
     return {
         "id": db_file["id"],
         "filename": db_file["filename"],
         "r2_key": db_file["r2_key"],
-        "dub_url": db_file["dub_url"],
+        "dub_url": db_file.get("dub_url"),
+        "dub_key": db_file.get("dub_key"),
         "proxy_url": proxy_url,
+    }
+
+
+@app.put("/api/files/{file_id}/link")
+async def update_file_link(file_id: int, request: Request, user: dict = Depends(require_auth)):
+    """Update the short link key for a file."""
+    file = database.get_file_by_id(file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Get the new key from request body
+    body = await request.json()
+    new_key = body.get("key", "").strip()
+    
+    if not new_key:
+        raise HTTPException(status_code=400, detail="Key is required")
+    
+    # Check if file has a dub link ID (required for updating)
+    dub_link_id = file.get("dub_link_id")
+    if not dub_link_id:
+        raise HTTPException(status_code=400, detail="This file does not have an editable short link")
+    
+    # Update the short link on dub.co
+    result = await dub.update_short_link(dub_link_id, new_key)
+    
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to update short link. The key may already be taken.")
+    
+    # Update the database
+    database.update_file_dub_link(file_id, result["shortLink"], result["key"])
+    
+    return {
+        "success": True,
+        "dub_url": result["shortLink"],
+        "dub_key": result["key"],
     }
 
 
@@ -217,6 +261,10 @@ async def delete_file(file_id: int, user: dict = Depends(require_auth)):
     except Exception as e:
         print(f"R2 delete error: {e}")
         # Continue anyway to clean up database
+    
+    # Delete dub.co link if we have the ID
+    if file.get("dub_link_id"):
+        await dub.delete_short_link(file["dub_link_id"])
     
     # Delete from database
     database.delete_file(file_id)

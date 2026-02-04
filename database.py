@@ -24,11 +24,22 @@ def init_db():
                 filename TEXT NOT NULL,
                 r2_key TEXT UNIQUE NOT NULL,
                 dub_url TEXT,
+                dub_link_id TEXT,
+                dub_key TEXT,
                 content_type TEXT,
                 size_bytes INTEGER,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Add dub_link_id and dub_key columns if they don't exist (migration for existing DBs)
+        try:
+            db.execute("ALTER TABLE files ADD COLUMN dub_link_id TEXT")
+        except:
+            pass  # Column already exists
+        try:
+            db.execute("ALTER TABLE files ADD COLUMN dub_key TEXT")
+        except:
+            pass  # Column already exists
         db.commit()
 
 
@@ -128,8 +139,21 @@ def delete_file(file_id: int) -> bool:
         return cursor.rowcount > 0
 
 
-def update_file_dub_url(file_id: int, dub_url: str):
+def update_file_dub_url(file_id: int, dub_url: str, dub_link_id: str = None, dub_key: str = None):
     """Update the dub.co URL for a file."""
     with get_db() as db:
-        db.execute("UPDATE files SET dub_url = ? WHERE id = ?", (dub_url, file_id))
+        db.execute(
+            "UPDATE files SET dub_url = ?, dub_link_id = ?, dub_key = ? WHERE id = ?",
+            (dub_url, dub_link_id, dub_key, file_id)
+        )
+        db.commit()
+
+
+def update_file_dub_link(file_id: int, dub_url: str, dub_key: str):
+    """Update the dub.co URL and key for a file (when editing the short link)."""
+    with get_db() as db:
+        db.execute(
+            "UPDATE files SET dub_url = ?, dub_key = ? WHERE id = ?",
+            (dub_url, dub_key, file_id)
+        )
         db.commit()

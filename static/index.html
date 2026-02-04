@@ -150,6 +150,64 @@
         border-color: #000;
       }
 
+      .btn-edit {
+        border-color: #666;
+        color: #666;
+      }
+
+      .btn-edit:hover {
+        background: #000;
+        color: #fff;
+        border-color: #000;
+      }
+
+      .btn-save {
+        border-color: #090;
+        color: #090;
+      }
+
+      .btn-save:hover {
+        background: #090;
+        color: #fff;
+        border-color: #090;
+      }
+
+      .btn-cancel {
+        border-color: #999;
+        color: #999;
+      }
+
+      .btn-cancel:hover {
+        background: #999;
+        color: #fff;
+      }
+
+      .edit-link-form {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 5px;
+      }
+
+      .edit-link-form input {
+        font-family: monospace;
+        font-size: 12px;
+        border: 1px solid #000;
+        padding: 3px 6px;
+        flex: 1;
+        max-width: 200px;
+      }
+
+      .link-key-display {
+        font-size: 12px;
+        color: #666;
+        margin-top: 3px;
+      }
+
+      .link-key-display strong {
+        color: #000;
+      }
+
       .status {
         padding: 10px;
         margin-bottom: 20px;
@@ -216,6 +274,21 @@
             method: "DELETE",
           });
           if (!res.ok) throw new Error("Failed to delete file");
+          return res.json();
+        },
+
+        async updateFileLink(id, key) {
+          const res = await fetch(`/api/files/${id}/link`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ key }),
+          });
+          if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.detail || "Failed to update link");
+          }
           return res.json();
         },
       };
@@ -354,9 +427,12 @@
                                     <input type="text" readonly value="${f.dub_url || window.location.origin + "/f/" + f.r2_key}" onclick="this.select()">
                                     <div class="file-actions">
                                         <button onclick="copyToClipboard('${f.dub_url || window.location.origin + "/f/" + f.r2_key}', this)">copy</button>
+                                        ${f.dub_link_id ? `<button class="btn-edit" onclick="showEditForm(${f.id}, '${escapeHtml(f.dub_key || '')}')">edit</button>` : ''}
                                         <button class="btn-delete" onclick="deleteFile(${f.id})">delete</button>
                                     </div>
                                 </div>
+                                ${f.dub_key ? `<div class="link-key-display">short link key: <strong>${escapeHtml(f.dub_key)}</strong></div>` : ''}
+                                <div id="edit-form-${f.id}" style="display: none;"></div>
                             </li>
                         `,
                           )
@@ -377,6 +453,57 @@
           loadFiles();
         } catch (err) {
           showStatus("Delete failed: " + err.message, "error");
+        }
+      }
+
+      function showEditForm(fileId, currentKey) {
+        const container = document.getElementById(`edit-form-${fileId}`);
+        if (container.style.display === "block") {
+          container.style.display = "none";
+          container.innerHTML = "";
+          return;
+        }
+        
+        container.style.display = "block";
+        container.innerHTML = `
+          <div class="edit-link-form">
+            <span>new key:</span>
+            <input type="text" id="edit-key-${fileId}" value="${currentKey}" placeholder="enter new key">
+            <button class="btn-save" onclick="saveEditedLink(${fileId})">save</button>
+            <button class="btn-cancel" onclick="cancelEdit(${fileId})">cancel</button>
+          </div>
+        `;
+        document.getElementById(`edit-key-${fileId}`).focus();
+      }
+
+      function cancelEdit(fileId) {
+        const container = document.getElementById(`edit-form-${fileId}`);
+        container.style.display = "none";
+        container.innerHTML = "";
+      }
+
+      async function saveEditedLink(fileId) {
+        const input = document.getElementById(`edit-key-${fileId}`);
+        const newKey = input.value.trim();
+        
+        if (!newKey) {
+          showStatus("Key cannot be empty", "error");
+          return;
+        }
+        
+        const saveBtn = input.parentElement.querySelector('.btn-save');
+        const origText = saveBtn.textContent;
+        saveBtn.disabled = true;
+        saveBtn.textContent = "saving...";
+        
+        try {
+          const result = await API.updateFileLink(fileId, newKey);
+          showStatus(`Link updated to: ${result.dub_url}`, "success");
+          loadFiles();
+        } catch (err) {
+          showStatus("Update failed: " + err.message, "error");
+          saveBtn.disabled = false;
+          saveBtn.textContent = origText;
         }
       }
 
