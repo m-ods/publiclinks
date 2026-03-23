@@ -154,6 +154,8 @@ async def get_me(user: dict = Depends(require_auth)):
 async def list_files(user: dict = Depends(require_auth)):
     """List all uploaded files."""
     files = database.get_all_files()
+    for f in files:
+        f["r2_url"] = f"{R2_PUBLIC_URL}/{f['r2_key']}"
     return {"files": files}
 
 

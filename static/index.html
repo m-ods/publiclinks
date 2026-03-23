@@ -424,9 +424,9 @@
                                     ${formatBytes(f.size_bytes)} · ${f.content_type} · ${formatDate(f.created_at)} · by ${escapeHtml(f.uploader_email)}
                                 </div>
                                 <div class="file-url">
-                                    <input type="text" readonly value="${f.dub_url || window.location.origin + "/f/" + f.r2_key}" onclick="this.select()">
+                                    <input type="text" readonly value="${f.dub_url || f.r2_url}" onclick="this.select()">
                                     <div class="file-actions">
-                                        <button onclick="copyToClipboard('${f.dub_url || window.location.origin + "/f/" + f.r2_key}', this)">copy</button>
+                                        <button onclick="copyToClipboard('${f.dub_url || f.r2_url}', this)">copy</button>
                                         ${f.dub_link_id ? `<button class="btn-edit" onclick="showEditForm(${f.id}, '${escapeHtml(f.dub_key || '')}')">edit</button>` : ''}
                                         <button class="btn-delete" onclick="deleteFile(${f.id})">delete</button>
                                     </div>
