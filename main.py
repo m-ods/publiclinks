@@ -187,10 +187,9 @@ async def upload_file(request: Request, file: UploadFile, user: dict = Depends(r
         size_bytes=len(content),
     )
     
-    # Create dub.co short link (using our proxy URL for auth)
+    # Create dub.co short link pointing to the public Cloudflare R2 URL
     # Use filename (without extension) as the default short link key
-    proxy_url = f"{BASE_URL}/f/{r2_key}"
-    dub_result = await dub.create_short_link(proxy_url, key=file.filename)
+    dub_result = await dub.create_short_link(r2_url, key=file.filename)
     
     if dub_result:
         database.update_file_dub_url(
@@ -209,7 +208,7 @@ async def upload_file(request: Request, file: UploadFile, user: dict = Depends(r
         "r2_key": db_file["r2_key"],
         "dub_url": db_file.get("dub_url"),
         "dub_key": db_file.get("dub_key"),
-        "proxy_url": proxy_url,
+        "r2_url": r2_url,
     }
 
 
